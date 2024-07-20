@@ -1,49 +1,49 @@
-# เรียกใช้งานไลบรารีที่จำเป็น
-import cv2                   # เรียกใช้ OpenCV เพื่อทำงานกับวิดีโอและรูปภาพ
-import numpy as np           # เรียกใช้ NumPy เพื่อการคำนวณทางคณิตศาสตร์และการจัดการข้อมูลที่มีโครงสร้าง
-import pickle                # เรียกใช้งาน pickle เพื่อการบันทึกและโหลดข้อมูลไฟล์
-import pandas as pd          # เรียกใช้งาน pandas เพื่อการจัดการข้อมูลในรูปแบบตาราง
-from ultralytics import YOLO  # เรียกใช้งาน YOLO จากไลบรารี ultralytics
-import cvzone                # เรียกใช้งาน cvzone เพื่อฟังก์ชันที่ช่วยในการวาดข้อความบนภาพ
+# Import necessary libraries
+import cv2                   # Import OpenCV for video and image processing
+import numpy as np           # Import NumPy for mathematical calculations and data manipulation
+import pickle                # Import pickle for saving and loading data files
+import pandas as pd          # Import pandas for table-like data management
+from ultralytics import YOLO  # Import YOLO from the ultralytics library
+import cvzone                # Import cvzone for functions to draw text on images
 
-# โหลดข้อมูล polylines และ area_names จากไฟล์ "freedomtech"
+# Load polylines and area_names from "freedomtech" file
 with open("freedomtech", "rb") as f:
     data = pickle.load(f)
     polylines, area_names = data['polylines'], data['area_names']
 
-# อ่านไฟล์ "coco.txt" และแบ่งข้อมูลออกเป็นรายการของคลาส
-my_file = open("coco.txt", "r")
-data = my_file.read()
+# Read "coco.txt" file and split data into a list of classes
+with open("coco.txt", "r") as my_file:
+    data = my_file.read()
 class_list = data.split("\n")
 
-# โหลดโมเดล YOLO
+# Load YOLO model
 model = YOLO('yolov8s.pt')
 
-# เปิดการใช้งานวิดีโอ
-cap = cv2.VideoCapture('easy.mp4')
+# Open video capture
+cap = cv2.VideoCapture('easy1.mp4')
 
-count = 0  # ตัวแปรนับเฟรม
+count = 0  # Frame counter
 
-# วนลูปเพื่ออ่านเฟรมและประมวลผล
+# Loop to read frames and process them
 while True:
-    ret, frame = cap.read()  # อ่านเฟรมจากวิดีโอ
+    ret, frame = cap.read()  # Read frame from video
     if not ret:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # ย้อนกลับไปที่จุดเริ่มต้นของวิดีโอเมื่อจบ
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Reset to the start of the video when finished
         continue
 
     count += 1
-    if count % 3 != 0:  # นับเฟรมแบบเล่นสัดส่วน
+    if count % 3 != 0:  # Process frames at a reduced rate
         continue
 
-    frame = cv2.resize(frame, (1020, 500))  # ปรับขนาดเฟรมให้เหมาะสม
+    frame = cv2.resize(frame, (1020, 500))  # Resize frame for consistency
 
-    # ทำนายผลลัพธ์ด้วย YOLO
+    # Predict results with YOLO
     results = model.predict(frame)
     a = results[0].boxes.data
     px = pd.DataFrame(a).astype("float")
     list1 = []
 
-    # วนลูปเพื่อประมวลผลตำแหน่งของวัตถุ
+    # Process object positions
     for index, row in px.iterrows():
         x1 = int(row[0])
         y1 = int(row[1])
@@ -55,35 +55,36 @@ while True:
         cy = int(y1 + y2) // 2
         if 'car' in c:
             list1.append([cx, cy])
-            cv2.rectangle(frame,(x1,y1),(x2,y2),(255,255,255),2) #กรอบสีขาวตรวจจับระบุรถ
-    counter1 = []  # ตัวแปรเก็บจำนวนรถ
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 255), 2)  # White rectangle for detected cars
 
-    # วนลูปเพื่อวาดพื้นที่และตรวจสอบการจอดรถ
+    counter1 = []  # Variable to store counted cars
+
+    # Draw areas and check parking
     for i, polyline in enumerate(polylines):
-        print(i)  # พิมพ์ข้อความบอกชื่อพื้นที่และดัชนี log
-        cv2.polylines(frame, [polyline], True, (0, 255, 0), 2)  # เฟรมสีเขียว รถว่าง
-        cvzone.putTextRect(frame, f'{area_names[i]}', tuple(polyline[0]), 1, 1)  # เพิ่มข้อความบอกชื่อพื้นที่ log
+        print(i)  # Log area name and index
+        cv2.polylines(frame, [polyline], True, (0, 255, 0), 2)  # Green frame for empty parking areas
+        cvzone.putTextRect(frame, f'{area_names[i]}', tuple(polyline[0]), 1, 1)  # Add text for area name
         for i1 in list1:
             cx1 = i1[0]
             cy1 = i1[1]
-            result = cv2.pointPolygonTest(polyline, ((cx1, cy1)), False)
+            result = cv2.pointPolygonTest(polyline, (cx1, cy1), False)
             if result >= 0:
-                cv2.circle(frame, (cx1, cy1), 5, (255, 0, 0), -1) #จุดสีน้ำเงิน Mark ตัวรถ
-                cv2.polylines(frame, [polyline], True, (0, 0, 255), 2) # เปลี่ยนเฟรมสีแดง เมื่อจุดน้ำเงินเข้ามาในเฟรม
-                counter1.append(cx1) #นับจำนวนรถที่จอด
+                cv2.circle(frame, (cx1, cy1), 5, (255, 0, 0), -1)  # Blue dot to mark car position
+                cv2.polylines(frame, [polyline], True, (0, 0, 255), 2)  # Red frame when car is in the area
+                counter1.append(cx1)  # Count parked cars
 
-    # คำนวณจำนวนรถและพื้นที่ที่ว่าง
-    car_count = len(counter1) #จำนวนรถที่จอด
-    free_space = len(polylines) - car_count #จำนวนที่ว่าง
+    # Calculate car count and free spaces
+    car_count = len(counter1)  # Number of parked cars
+    free_space = len(polylines) - car_count  # Number of free spaces
 
-    # เพิ่มข้อความแสดงผลลงบนเฟรม
-    cvzone.putTextRect(frame, f'CAR COUNTER: {car_count}', (50, 60), 2, 2)  # ป้ายแสดงจำนวนรถจอด
-    cvzone.putTextRect(frame, f'CAR FREE SPACE: {free_space}', (50, 110), 2, 2)  # ป้ายแสดงจำนวนที่ว่าง
+    # Add result text to the frame
+    cvzone.putTextRect(frame, f'CAR COUNTER: {car_count}', (50, 60), 2, 2)  # Display number of parked cars
+    cvzone.putTextRect(frame, f'CAR FREE SPACE: {free_space}', (50, 110), 2, 2)  # Display number of free spaces
 
-    # แสดงเฟรม
+    # Show frame
     cv2.imshow('FRAME', frame)
     key = cv2.waitKey(1) & 0xFF
 
-# ปิดการใช้งานวิดีโอและหน้าต่าง
+# Release video capture and close windows
 cap.release()
 cv2.destroyAllWindows()
