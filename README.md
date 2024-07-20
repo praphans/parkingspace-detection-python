@@ -38,4 +38,4 @@ In the `software` folder, you will find recommended software tools to enhance yo
 - **test2.py**: Execute this script to detect and count empty parking spaces and cars using the defined parking spaces.
 
 # Demo Screenshots
-![alt text](https://github.com/praphanth/parkingspace-detection-python/img-demo.png?raw=true)
+![alt text](https://github.com/praphanth/parkingspace-detection-python/blob/master/img-demo.png?raw=true)
